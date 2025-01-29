@@ -18,7 +18,7 @@ Git follows a Last-In-First-Out (LIFO) approach in many operations, similar to a
 - Supports undo (pop operation) and redo.
 - Demonstrates branching and merging using multiple stacks.
 
-## 😊 Contrubuters 
+## 😊 Collaborators 
  - Jayanth-Rookie : https://github.com/Jayanth-Rookie
  - Hiral K Jain : https://github.com/hiralkjain
  - HemanthBD2005 : https://github.com/HemanthBD2005
