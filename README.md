@@ -24,5 +24,5 @@ Git follows a Last-In-First-Out (LIFO) approach in many operations, similar to a
 - Basic understanding of Git and Stack data structures
 
 ### Installation
-Clone this repository:  
+Clone this repository: https://github.com/BhuvanR75/githubvisual.git 
 ```bash
