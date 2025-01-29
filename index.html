@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Visual Branching with Data Flow</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      background-color: #0d1117;
+      color: #c9d1d9;
+      overflow: hidden;
+    }
+
+    .main-content {
+      display: flex;
+      height: 100vh;
+    }
+
+    .left-panel {
+      flex: 1;
+      min-width: 0;
+    }
+
+    header {
+      background-color: #161b22;
+      padding: 1rem;
+      border-bottom: 1px solid #30363d;
+    }
+
+    header h1 {
+      margin: 0;
+      color: #c9d1d9;
+    }
+
+    .controls {
+      padding: 1rem;
+      background-color: #161b22;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      background-color: #238636;
+      color: #ffffff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #2ea043;
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      background-color: #3c444d;
+      cursor: not-allowed;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+      flex: 1;
+    }
+
+    input {
+      flex: 1;
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background-color: #0d1117;
+      color: #c9d1d9;
+    }
+
+    #graph-container {
+      padding: 2rem;
+      height: calc(100vh - 140px);
+    }
+
+
+
+    .node {
+      fill: #1f2428;
+      stroke: #388bfd;
+      stroke-width: 2;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .node:hover {
+      fill: #2d333b;
+    }
+
+    .node.selected {
+      fill: #5060c6;
+      stroke: #533fec;
+    }
+
+    .node.main {
+      fill: #1f2428;
+      stroke: #8957e5;
+    }
+
+    .node-label {
+      fill: #ffffff;
+      text-anchor: middle;
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    .node-data {
+      fill: #8b949e;
+      text-anchor: middle;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .connection {
+      stroke: #30363d;
+      stroke-width: 2;
+    }
+
+    .right-panel {
+      width: 300px;
+      background: #161b22;
+      border-left: 1px solid #30363d;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    .visualization-title {
+      text-align: center;
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+      color: #c9d1d9;
+    }
+
+    .fluid-container {
+      position: relative;
+      background: #1f2428;
+      border: 2px solid #388bfd;
+      border-radius: 8px;
+      margin: 2rem auto;
+      overflow: hidden;
+      display: block;
+      justify-content: center;
+      align-items: center;
+      opacity: 1;
+    }
+
+    .main-container {
+      width: 120px;
+      height: 180px;
+    }
+
+    .branch-container {
+      width: 80px;
+      height: 120px;
+    }
+
+    .container-label {
+      position: absolute;
+      top: -25px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: #c9d1d9;
+      font-size: 0.9rem;
+    }
+
+    .water {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #58a6ff;
+      transition: height 0.5s ease-out;
+    }
+
+    .water-ripple {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.2) 0%,
+        transparent 50%,
+        rgba(255,255,255,0.2) 100%
+      );
+      animation: ripple 2s linear infinite;
+    }
+
+    @keyframes ripple {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-100%); }
+    }
+
+    .branch-containers {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 2fr));
+      gap: 2rem;
+      padding: 1rem;
+    }
+
+    .flow-particle {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      background: #58a6ff;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+.conflict {
+  background-color: #ff7b7b;  
+  color: #fff;
+  padding: 0.5rem;
+  border-radius: 6px;
+  margin-top: 1rem;
+}
+
+.conflict-message {
+  font-size: 1rem;
+  color: #ff0000;
+  margin-top: 1rem;
+}
+
+
+    
+  </style>
+</head>
+<body>
+  <div class="main-content">
+    <div class="left-panel">
+      <header>
+        <h1>GitHub Visual Branching</h1>
+      </header>
+
+      <div class="controls">
+        <button id="newBranch">New Branch</button>
+        <div class="input-group">
+          <input type="text" id="dataInput" placeholder="Enter data to commit...">
+          <button id="commit">Commit</button>
+        </div>
+        <button id="merge">Merge to Main</button>
+        <button id="revert">Revert Main</button>
+        <button id="delete">Delete Branch</button>
+      </div>
+
+      <div id="graph-container">
+        <svg id="graph" width="100%" height="100%">
+          <g id="connections"></g>
+          <g id="nodes"></g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="conflict-message" id="conflict-message" style="display: none;"></div>
+
+      <h2 class="visualization-title">Data Flow Visualization</h2>
+      
+      <div class="fluid-container1 main-container">
+        <div class="container-label">Main Branch</div>
+        <div class="water" style="height: 0%">
+          <div class="water-ripple"></div>
+        </div>
+      </div>
+
+      <div class="branch-containers">
+         Branch containers will be added here dynamically 
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class Branch {
+      constructor(name, x, y) {
+        this.name = name;
+        this.data = [];
+        this.x = x;
+        this.y = y;
+      }
+    }
+
+    const state = {
+      branches: new Map(),
+      selectedBranch: null,
+      mainBranch: new Branch('main', 150, 300),
+      branchCount: 0
+    };
+
+    function createNode(branch, isMain = false) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${branch.x},${branch.y})`);
+  g.setAttribute('data-name', branch.name);
+
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.classList.add('node');
+  if (isMain) {
+    rect.classList.add('main');
+    rect.setAttribute('x', -120);
+    rect.setAttribute('y', -60);
+    rect.setAttribute('width', '240');
+    rect.setAttribute('height', '120');
+  } else {
+    rect.setAttribute('x', -80);
+    rect.setAttribute('y', -40);
+    rect.setAttribute('width', '160');
+    rect.setAttribute('height', '80');
+  }
+
+  const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  label.classList.add('node-label');
+  label.setAttribute('y', '-15');
+  label.textContent = branch.name;
+
+  const data = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  data.classList.add('node-data');
+  data.setAttribute('y', '15');
+  data.textContent = branch.data.length ? branch.data.join(', ') : 'Empty';
+
+  g.appendChild(rect);
+  g.appendChild(label);
+  g.appendChild(data);
+
+  if (!isMain) {
+    g.addEventListener('click', () => selectBranch(branch.name));
+
+    const connection = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    connection.classList.add('connection');
+    connection.setAttribute('x1', state.mainBranch.x);
+    connection.setAttribute('y1', state.mainBranch.y);
+    connection.setAttribute('x2', branch.x);
+    connection.setAttribute('y2', branch.y);
+    connection.setAttribute('data-branch', branch.name); 
+    document.getElementById('connections').appendChild(connection);
+  }
+
+  return g;
+}
+
+
+    function createFluidContainer(branchName, isMain = false) {
+      const container = document.createElement('div');
+      container.className = `fluid-container ${isMain ? 'main-container' : 'branch-container'}`;
+      container.id = `fluid-${branchName}`;
+
+      const label = document.createElement('div');
+      label.className = 'container-label';
+      label.textContent = branchName;
+
+      const water = document.createElement('div');
+      water.className = 'water';
+      water.style.height = '0%';
+
+      const ripple = document.createElement('div');
+      ripple.className = 'water-ripple';
+
+      water.appendChild(ripple);
+      container.appendChild(label);
+      container.appendChild(water);
+
+      return container;
+    }
+
+    function getRandomColor() {
+  
+  const hue = Math.floor(Math.random() * 360);
+  return `hsl(${hue}, 70%, 60%)`;
+}
+
+function createFluidContainer(branchName, isMain = false) {
+  const container = document.createElement('div');
+  container.className = `fluid-container ${isMain ? 'main-container' : 'branch-container'}`;
+  container.id = `fluid-${branchName}`;
+
+  const label = document.createElement('div');
+  label.className = 'container-label';
+  label.textContent = branchName;
+
+  const water = document.createElement('div');
+  water.className = 'water';
+  water.style.height = '0%';
+  
+  
+  if (!isMain) {
+    const branchColor = getRandomColor();
+    water.style.backgroundColor = branchColor;
+  } else {
+    
+    water.style.backgroundColor = '#58a6ff';
+  }
+
+  const ripple = document.createElement('div');
+  ripple.className = 'water-ripple';
+
+  water.appendChild(ripple);
+  container.appendChild(label);
+  container.appendChild(water);
+
+  return container;
+}
+
+
+const branchColors = new Map();
+
+function getOrCreateBranchColor(branchName) {
+  if (!branchColors.has(branchName)) {
+    branchColors.set(branchName, getRandomColor());
+  }
+  return branchColors.get(branchName);
+}
+
+function updateFluidLevel(branchName, dataCount) {
+  const container = document.getElementById(`fluid-${branchName}`);
+  if (container) {
+    const water = container.querySelector('.water');
+    const percentage = Math.min(100, dataCount * 10);
+    water.style.height = `${percentage}%`;
+
+    if (branchName !== 'main') {
+      const branchColor = getOrCreateBranchColor(branchName);
+      water.style.backgroundColor = branchColor;
+    }
+  }
+}
+function updateFluidLevel(branchName, dataCount) {
+  const container = document.getElementById(`fluid-${branchName}`);
+  if (container) {
+    const water = container.querySelector('.water');
+    const percentage = Math.min(100, dataCount * 10); 
+    water.style.height = `${percentage}%`;
+  }
+}
+function checkMergeConflicts(targetBranch, sourceBranch) {
+  const target = state.branches.get(targetBranch);
+  const source = state.branches.get(sourceBranch);
+
+  if (!target || !source) {
+    return {
+      hasConflicts: false,
+      conflicts: [],
+      errorMessage: "One or both branches do not exist."
+    };
+  }
+
+  const conflicts = source.data.filter(data => target.data.includes(data));
+
+  return {
+    hasConflicts: conflicts.length > 0,
+    conflicts,
+    errorMessage: conflicts.length > 0 
+      ? `Conflicts found: Duplicate data across branches` 
+      : null
+  };
+}
+
+function mergeBranches(targetBranch, sourceBranch) {
+  const conflictResult = checkMergeConflicts(targetBranch, sourceBranch);
+  const conflictMessageElement = document.getElementById('conflict-message');
+
+  document.querySelectorAll('.node').forEach((node) => node.classList.remove('conflict'));
+
+  if (conflictResult.hasConflicts) {
+    conflictMessageElement.style.display = 'block';
+    conflictMessageElement.textContent = `Merge Conflicts Detected:
+      Target Branch: ${targetBranch}
+      Source Branch: ${sourceBranch}
+      Conflicting Data: ${conflictResult.conflicts.join(', ')}`;
+
+    const targetNode = document.querySelector(`[data-name="${targetBranch}"] .node`);
+    const sourceNode = document.querySelector(`[data-name="${sourceBranch}"] .node`);
+    
+    if (targetNode) targetNode.classList.add('conflict');
+    if (sourceNode) sourceNode.classList.add('conflict');
+
+    return false; 
+  }
+
+  const target = state.branches.get(targetBranch);
+  const source = state.branches.get(sourceBranch);
+
+  target.data = [...new Set([...target.data, ...source.data])];
+
+  updateFluidLevel(targetBranch, target.data.length);
+  updateNodeData(target);
+
+  conflictMessageElement.style.display = 'none';
+  
+  console.log(`Successfully merged ${sourceBranch} into ${targetBranch}`);
+  
+  return true; 
+}
+
+function resolveConflicts(targetBranch, sourceBranch, strategy = 'keep-both') {
+  const conflictResult = checkMergeConflicts(targetBranch, sourceBranch);
+  
+  if (!conflictResult.hasConflicts) {
+    return mergeBranches(targetBranch, sourceBranch);
+  }
+
+  const target = state.branches.get(targetBranch);
+  const source = state.branches.get(sourceBranch);
+
+  switch (strategy) {
+    case 'keep-both':
+      target.data = [...new Set([...target.data, ...source.data])];
+      break;
+    
+    case 'keep-target':
+      break;
+    
+    case 'keep-source':
+      target.data = [...source.data];
+      break;
+    
+    default:
+      console.warn('Unknown conflict resolution strategy');
+      return false;
+  }
+
+  updateFluidLevel(targetBranch, target.data.length);
+  updateNodeData(target);
+
+  document.getElementById('conflict-message').style.display = 'none';
+
+  return true;
+}
+
+document.getElementById('merge').addEventListener('click', () => {
+  if (!state.selectedBranch) {
+    alert('Please select a branch before merging.');
+    return;
+  }
+
+  const mergeResult = mergeBranches('main', state.selectedBranch);
+  
+  if (!mergeResult) {
+    const confirmResolve = confirm('Conflicts detected. Do you want to resolve them?');
+    if (confirmResolve) {
+      resolveConflicts('main', state.selectedBranch);
+    }
+  }
+});
+
+
+function selectBranch(branchName) {
+  if (state.selectedBranch === branchName) return;
+  state.selectedBranch = branchName;
+
+  document.querySelectorAll('.node').forEach((node) => node.classList.remove('selected'));
+  const branchNode = document.querySelector(`[data-name="${branchName}"] .node`);
+  if (branchNode) branchNode.classList.add('selected');
+}
+
+function addBranch() {
+  let x = 400 + (state.branchCount % 3) * 200; // Place branches to the right of the main branch
+  let y = 150 + Math.floor(state.branchCount / 3) * 150; // Stack branches vertically, with 3 branches per row
+
+  if (x > 800) {
+    alert('Branches are exceeding workspace bounds. Adjust layout or remove old branches.');
+    return;
+  }
+
+  const branchName = `branch-${state.branchCount + 1}`;
+  const branch = new Branch(branchName, x, y);
+  state.branches.set(branchName, branch);
+
+  const node = createNode(branch);
+  document.getElementById('nodes').appendChild(node);
+
+  const fluidContainer = createFluidContainer(branchName);
+  document.querySelector('.branch-containers').appendChild(fluidContainer);
+
+  state.branchCount++;
+}
+
+
+
+
+
+function commitData() {
+  const dataInput = document.getElementById('dataInput');
+  const data = dataInput.value.trim();
+  if (!data) return;
+
+  if (!state.selectedBranch) {
+    alert('Please select a branch before committing data.');
+    return;
+  }
+
+  const branch = state.branches.get(state.selectedBranch);
+  branch.data.push(data);
+  dataInput.value = '';
+
+  updateFluidLevel(state.selectedBranch, branch.data.length);
+  updateNodeData(branch);
+}
+
+function mergeToMain() {
+  if (!state.selectedBranch) {
+    alert('Please select a branch before merging.');
+    return;
+  }
+
+  const branch = state.branches.get(state.selectedBranch);
+  if (!branch || branch.data.length === 0) {
+    alert('Selected branch has no data to merge.');
+    return;
+  }
+
+  // Merge the data from the selected branch into the main branch
+  state.mainBranch.data = [...state.mainBranch.data, ...branch.data];
+
+  // No need to clear the branch data
+  // branch.data = [];  // Remove this line to keep the branch data
+
+  // Update fluid levels and node data
+  updateFluidLevel(state.selectedBranch, branch.data.length);
+  updateFluidLevel('main', state.mainBranch.data.length);
+  updateNodeData(state.mainBranch);
+  updateNodeData(branch);
+}
+
+
+function revertMain() {
+  if (state.mainBranch.data.length === 0) {
+    alert('Main branch has no data to revert.');
+    return;
+  }
+
+  state.mainBranch.data.pop();
+  updateFluidLevel('main', state.mainBranch.data.length);
+  updateNodeData(state.mainBranch);
+}
+
+function deleteBranch() {
+  if (!state.selectedBranch) {
+    alert('Please select a branch to delete.');
+    return;
+  }
+
+  const branchName = state.selectedBranch;
+  const branch = state.branches.get(branchName);
+
+  if (branch) {
+    // Remove the node representing the branch
+    document.querySelector(`[data-name="${branchName}"]`).remove();
+
+    // Remove the fluid container associated with the branch
+    document.getElementById(`fluid-${branchName}`).remove();
+
+    // Remove the connection line (use data-branch to target the correct line)
+    const connectionLine = document.querySelector(`line[data-branch="${branchName}"]`);
+    if (connectionLine) {
+      connectionLine.remove();
+    }
+
+    // Delete the branch from the state
+    state.branches.delete(branchName);
+    state.selectedBranch = null;
+  }
+}
+
+
+function updateNodeData(branch) {
+  const branchNode = document.querySelector(`[data-name="${branch.name}"] .node-data`);
+  if (branchNode) {
+    branchNode.textContent = branch.data.length ? branch.data.join(', ') : 'Empty';
+  }
+
+}
+
+document.getElementById('newBranch').addEventListener('click', addBranch);
+document.getElementById('commit').addEventListener('click', commitData);
+document.getElementById('merge').addEventListener('click', mergeToMain);
+document.getElementById('revert').addEventListener('click', revertMain);
+document.getElementById('delete').addEventListener('click', deleteBranch);
+
+// Initialize main branch node and visualization
+const mainNode = createNode(state.mainBranch, true);
+document.getElementById('nodes').appendChild(mainNode);
+
+// Position the main branch container correctly inside the .right-panel section
+const mainFluidContainer = createFluidContainer('main', true);
+document.querySelector('.right-panel').appendChild(mainFluidContainer);
+
+// Ensure the parent container (.right-panel) uses flex layout to contain the main and branch containers
+document.querySelector('.right-panel').style.display = 'flex';
+document.querySelector('.right-panel').style.flexDirection = 'column'; // Stack vertically
+document.querySelector('.right-panel').style.alignItems = 'center'; // Optionally center
+
+// Set the main container layout using flex properties
+document.getElementById('fluid-main').style.marginTop = '20px';  // Top margin for the main container
+document.getElementById('fluid-main').style.flexShrink = '0';  // Ensure the main container does not shrink
+
+// Create a container for the branch containers (using flexbox)
+const branchContainers = document.createElement('div');
+branchContainers.className = 'branch-containers'; // Use flex for branch containers
+document.querySelector('.right-panel').appendChild(branchContainers);
+
+
+  </script>
+  
+  
+</body>
+</html>
+
+ 
